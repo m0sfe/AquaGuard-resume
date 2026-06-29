@@ -768,7 +768,7 @@ function simulateGov(govKey, forcedType = null) {
       };
       results.push(segData);
       if (ftype !== 'normal')
-        alerts.push({ ...segData, ts: new Date().toLocaleTimeString() });
+        alerts.push({ ...segData, ts: toLatinDigits(new Date().toLocaleTimeString('en-GB')) });
       flowIn = flowOut;
       pressIn = pressOut;
     });
@@ -1318,7 +1318,7 @@ function NationalCarrierMap({
         fontFamily="monospace"
         fontWeight="700"
       >
-        التدفق الحالي ≈{' '}
+        التدفق الحالي حوالي{' '}
         {(totalOutflowM3PerHr || 0).toLocaleString(undefined, {
           maximumFractionDigits: 0,
         })}{' '}
@@ -2322,15 +2322,13 @@ function PipeNetworkMap({
 // ══════════════════════════════════════════════════════════════════════════════
 // NRW GAUGE
 // ══════════════════════════════════════════════════════════════════════════════
-function NRWGauge({ nrw, target }) {
+function NRWGauge({ nrw, target, baseline }) {
   const pct = Math.round(nrw * 100);
   const tgt = Math.round(target * 100);
+  const basePct = baseline != null ? Math.round(baseline * 100) : null;
+  const gaugeColor = pct > 40 ? '#ef4444' : pct > tgt ? '#f59e0b' : '#22c55e';
   const data = [
-    {
-      name: 'NRW',
-      value: pct,
-      fill: nrw > 0.5 ? '#ef4444' : nrw > 0.4 ? '#f59e0b' : '#22c55e',
-    },
+    { name: 'NRW', value: pct, fill: gaugeColor },
     { name: 'Gap', value: 100 - pct, fill: '#1e293b' },
   ];
   return (
@@ -2371,19 +2369,31 @@ function NRWGauge({ nrw, target }) {
         >
           <div
             style={{
-              fontSize: 20,
-              fontWeight: 700,
+              fontSize: 18,
+              fontWeight: 800,
               fontFamily: 'monospace',
-              color: pct > 50 ? '#ef4444' : pct > 40 ? '#f59e0b' : '#22c55e',
+              color: gaugeColor,
             }}
           >
-            {pct}%
+            <span style={{ fontSize: 11, fontWeight: 700 }}>حوالي </span>
+            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>
+              {pct}%
+            </span>
           </div>
         </div>
       </div>
-      <div style={{ fontSize: 10, color: '#64748b' }}>
-        Target:{' '}
-        <span style={{ color: '#22c55e', fontWeight: 600 }}>{tgt}%</span>
+      <div style={{ fontSize: 10.5, color: '#94A3B8', fontWeight: 700 }}>
+        {basePct != null && (
+          <>
+            قبل:{' '}
+            <span dir="ltr" style={{ color: '#CBD5E1', fontWeight: 800 }}>
+              {basePct}%
+            </span>
+            {' · '}
+          </>
+        )}
+        الهدف: <span dir="ltr" style={{ color: '#22c55e', fontWeight: 800 }}>30%</span>{' '}
+        أو أقل
       </div>
     </div>
   );
@@ -2479,6 +2489,43 @@ function formatConfidence(value, fallback = 0.98) {
   if (!isFinite(n)) return '—';
   const pct = n <= 1 ? n * 100 : n;
   return `${Math.round(pct)}%`;
+}
+
+// Context-aware confidence: hide weak numbers in the normal state.
+function confidenceLabel(type, value) {
+  if (!type || type === 'normal') return 'مستقر';
+  return formatConfidence(value);
+}
+
+// Display-only NRW strategy (does NOT touch simulation / gov.nrw).
+// gov.nrw stays the baseline (before AquaGuard).
+const EXPECTED_REDUCTION_RATE = 0.16; // expected relative NRW reduction (estimate)
+const TARGET_NRW_RATE = 0.3; // operational target after expansion
+function getExpectedResidualNRW(nrw) {
+  return nrw * (1 - EXPECTED_REDUCTION_RATE);
+}
+
+// Force Latin (English) digits regardless of browser locale.
+function toLatinDigits(value) {
+  return String(value).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) =>
+    String(
+      d.charCodeAt(0) - (d >= '\u06F0' ? 0x06f0 : 0x0660),
+    ),
+  );
+}
+
+// Realistic diurnal baseline so charts never start as a flat line of zeros.
+function makeBaselineSeries(range, n = 30) {
+  const [min, max] = range || [0, 1];
+  const span = Math.max(0, max - min);
+  return Array.from({ length: n }, (_, i) => {
+    const h = (i / n) * 24;
+    const morning = Math.max(0, Math.sin(((h - 6) / 24) * Math.PI * 2));
+    const evening = Math.max(0, Math.sin(((h - 13) / 24) * Math.PI * 2));
+    const jitter = (Math.sin(i * 1.7) + Math.cos(i * 0.9)) * 0.03;
+    const frac = Math.min(0.85, Math.max(0.14, 0.2 + 0.34 * morning + 0.2 * evening + jitter));
+    return +(min + span * frac).toFixed(1);
+  });
 }
 
 function getRiskLabel(type) {
@@ -2737,7 +2784,7 @@ function SuggestedActionsPanel({
           {actionLog.length === 0 && (
             <div
               style={{
-                color: '#64748b',
+                color: '#94a3b8',
                 fontSize: 12,
                 textAlign: 'center',
                 padding: 18,
@@ -2790,7 +2837,7 @@ function SuggestedActionsPanel({
               </div>
               <div
                 style={{
-                  color: '#64748b',
+                  color: '#94a3b8',
                   fontSize: 11,
                   lineHeight: 1.6,
                   marginTop: 4,
@@ -2946,12 +2993,25 @@ export default function AquaGuardDashboard() {
   const [simMode, setSimMode] = useState(false);
   const [simPressure, setSimPressure] = useState(80);
   const [simFlow, setSimFlow] = useState(300);
-  const [flowHist, setFlowHist] = useState(Array(30).fill(0));
-  const [pressHist, setPressHist] = useState(Array(30).fill(0));
+  const [flowHist, setFlowHist] = useState(() =>
+    makeBaselineSeries(NETWORK['Amman'].flowR),
+  );
+  const [pressHist, setPressHist] = useState(() =>
+    makeBaselineSeries(NETWORK['Amman'].presR),
+  );
   const [scatterData, setScatterData] = useState([]);
   const [activeTab, setActiveTab] = useState('map');
   const [actionLog, setActionLog] = useState([]);
   const menuRef = useRef(null);
+
+  // Re-seed chart baselines to the selected governorate (visual only).
+  useEffect(() => {
+    const g = NETWORK[govKey];
+    if (!g) return;
+    setFlowHist(makeBaselineSeries(g.flowR));
+    setPressHist(makeBaselineSeries(g.presR));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [govKey]);
 
   // ─── HYDRAULIC STATE ──────────────────────────────────────────────────
   // Persistent reservoir volumes per governorate (Record<string, number>)
@@ -3053,7 +3113,7 @@ export default function AquaGuardDashboard() {
           [
             ...alerts.map((a) => ({
               ...a,
-              ts: a.ts || new Date().toLocaleTimeString(),
+              ts: a.ts || toLatinDigits(new Date().toLocaleTimeString('en-GB')),
             })),
             ...prev,
           ].slice(0, 60)
@@ -3107,9 +3167,12 @@ export default function AquaGuardDashboard() {
     systemLossM3: 0,
     deliveredM3: 0,
   };
+  // Display-only post-AquaGuard residual figures (do NOT alter mass-balance).
+  const displayedResidualNRW = getExpectedResidualNRW(gov.nrw);
+  const displayedLossM3 = (mass.cycleOutflowM3 || 0) * displayedResidualNRW;
+  const displayedDeliveredM3 = (mass.cycleOutflowM3 || 0) - displayedLossM3;
   const alertSegs = segments.filter((s) => s.alert);
   const burstSegs = segments.filter((s) => s.predType === 'burst');
-  const maxLoss = Math.max(0, ...segments.map((s) => s.flowLoss));
   const maxDP = Math.max(0, ...segments.map((s) => Math.abs(s.dpDev)));
   const worstType = burstSegs.length
     ? 'burst'
@@ -3136,7 +3199,7 @@ export default function AquaGuardDashboard() {
             segment: seg
               ? `${seg.branch} · D${seg.depth} · ${seg.from} → ${seg.to}`
               : 'لا يوجد مقطع محدد',
-            time: new Date().toLocaleTimeString(),
+            time: toLatinDigits(new Date().toLocaleTimeString('en-GB')),
             segSnapshot: seg,
           },
           ...prev,
@@ -3192,7 +3255,7 @@ export default function AquaGuardDashboard() {
         style={{
           margin: '14px 20px 0',
           padding: '14px 24px',
-          minHeight: 106,
+          minHeight: 116,
           borderRadius: 24,
           background:
             'linear-gradient(135deg,rgba(13,25,48,.88),rgba(6,11,24,.78))',
@@ -3220,11 +3283,11 @@ export default function AquaGuardDashboard() {
         <div
           style={{
             position: 'absolute',
-            right: 30,
+            right: 28,
             top: '50%',
             transform: 'translateY(-50%)',
-            width: 98,
-            height: 98,
+            width: 112,
+            height: 112,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3248,10 +3311,10 @@ export default function AquaGuardDashboard() {
             style={{
               position: 'relative',
               zIndex: 1,
-              width: 90,
-              height: 90,
+              width: 104,
+              height: 104,
               objectFit: 'contain',
-              filter: 'drop-shadow(0 0 16px rgba(34,229,255,.45))',
+              filter: 'drop-shadow(0 0 18px rgba(34,229,255,.5))',
             }}
           />
         </div>
@@ -3265,7 +3328,7 @@ export default function AquaGuardDashboard() {
             flexDirection: 'column',
             alignItems: 'flex-start',
             gap: 9,
-            marginRight: 150,
+            marginRight: 168,
           }}
         >
           <div
@@ -3407,13 +3470,15 @@ export default function AquaGuardDashboard() {
             <span style={{ color: '#94A3B8' }}>
               الثقة:{' '}
               <span
+                dir="ltr"
                 style={{
                   color: '#F8FAFC',
                   fontWeight: 900,
                   fontFamily: 'monospace',
+                  unicodeBidi: 'isolate',
                 }}
               >
-                {formatConfidence(selectedOrWorst?.confidence)}
+                {confidenceLabel(worstType, selectedOrWorst?.confidence)}
               </span>
             </span>
           </div>
@@ -3574,7 +3639,7 @@ export default function AquaGuardDashboard() {
           </div>
 
           <div
-            style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}
+            style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}
           >
             {gov.source}
           </div>
@@ -3628,7 +3693,7 @@ export default function AquaGuardDashboard() {
             style={{
               marginLeft: 'auto',
               fontSize: 11,
-              color: '#475569',
+              color: '#94a3b8',
               fontFamily: 'monospace',
             }}
           >
@@ -3654,10 +3719,28 @@ export default function AquaGuardDashboard() {
             },
             { l: 'الإنذارات النشطة', v: alertSegs.length, u: `${allAlerts.length} في السجل`, c: '#F59E0B', icon: <Bell size={18} /> },
             {
-              l: 'نسبة الفاقد الحالية',
-              v: `${Math.max(maxLoss, gov.nrw * 100).toFixed(1)}%`,
-              u: 'مؤشر NRW · الهدف ≤ 30%',
-              c: gov.nrw > 0.5 ? '#EF4444' : gov.nrw > 0.4 ? '#F59E0B' : '#22C55E',
+              l: 'الفاقد المتبقي المتوقع',
+              v: (
+                <span>
+                  حوالي{' '}
+                  <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>
+                    {(getExpectedResidualNRW(gov.nrw) * 100).toFixed(0)}%
+                  </span>
+                </span>
+              ),
+              u: (
+                <span>
+                  قبل <span dir="ltr">AquaGuard</span>:{' '}
+                  <span dir="ltr">{(gov.nrw * 100).toFixed(0)}%</span> · الهدف بعد
+                  التوسع: <span dir="ltr">30%</span> أو أقل
+                </span>
+              ),
+              c:
+                getExpectedResidualNRW(gov.nrw) > 0.4
+                  ? '#EF4444'
+                  : getExpectedResidualNRW(gov.nrw) > TARGET_NRW_RATE
+                  ? '#F59E0B'
+                  : '#22C55E',
               icon: <TrendingDown size={18} />,
             },
             { l: 'زمن الاستجابة', v: '15 ثانية', u: `كشف وتصنيف فوري · التالي خلال ${countdown} ث`, c: '#22E5FF', icon: <Zap size={18} /> },
@@ -3811,7 +3894,7 @@ export default function AquaGuardDashboard() {
                       <div
                         style={{
                           fontSize: 9,
-                          color: '#64748b',
+                          color: '#94a3b8',
                           fontFamily: 'monospace',
                           letterSpacing: 0.3,
                         }}
@@ -3827,21 +3910,21 @@ export default function AquaGuardDashboard() {
                       <div
                         style={{
                           fontSize: 9,
-                          color: '#64748b',
+                          color: '#94a3b8',
                           fontFamily: 'monospace',
                           textAlign: 'center',
                         }}
                       >
                         {(currentReservoir / 1000).toFixed(1)}k
                         <br />
-                        <span style={{ color: '#334155' }}>
+                        <span style={{ color: '#94a3b8' }}>
                           / {(gov.reservoirCap / 1000).toFixed(0)}k م³
                         </span>
                       </div>
                       <div
                         style={{
                           fontSize: 8,
-                          color: '#64748b',
+                          color: '#94a3b8',
                           textAlign: 'center',
                           paddingTop: 4,
                           borderTop: '1px solid rgba(56,189,248,.1)',
@@ -3950,7 +4033,7 @@ export default function AquaGuardDashboard() {
                   </div>
                   <div
                     style={{
-                      color: '#64748b',
+                      color: '#94a3b8',
                       fontSize: 11,
                       marginBottom: 10,
                       lineHeight: 1.6,
@@ -4244,9 +4327,9 @@ export default function AquaGuardDashboard() {
                     <div style={{ gridColumn: '1 / -1', color: '#F8FAFC', fontWeight: 950, fontSize: 13 }}>
                       آخر قراءة تشغيلية
                     </div>
-                    <MiniMetric label="الوقت" value={new Date().toLocaleTimeString('ar-JO', { hour: '2-digit', minute: '2-digit' })} color="#22E5FF" />
+                    <MiniMetric label="الوقت" value={toLatinDigits(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))} color="#22E5FF" />
                     <MiniMetric label="الحالة" value={getTypeLabelAr(selectedOrWorst?.predType || 'normal')} color={getTypeColor(selectedOrWorst?.predType || 'normal')} />
-                    <MiniMetric label="الثقة" value={formatConfidence(selectedOrWorst?.confidence)} color="#38BDF8" />
+                    <MiniMetric label="الثقة" value={confidenceLabel(selectedOrWorst?.predType, selectedOrWorst?.confidence)} color="#38BDF8" />
                     <MiniMetric
                       label="الإجراء المقترح"
                       value={
@@ -4420,17 +4503,22 @@ export default function AquaGuardDashboard() {
             >
               <div
                 style={{
-                  fontSize: 10,
-                  color: '#475569',
-                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: '#94A3B8',
+                  fontFamily: "'IBM Plex Mono','Tajawal',monospace",
+                  fontWeight: 800,
                   letterSpacing: 0.5,
                   marginBottom: 10,
                 }}
               >
-                نظرة هيدروليكية
+                ملخص التشغيل الهيدروليكي
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <NRWGauge nrw={gov.nrw} target={gov.target_nrw} />
+                <NRWGauge
+                  nrw={getExpectedResidualNRW(gov.nrw)}
+                  target={TARGET_NRW_RATE}
+                  baseline={gov.nrw}
+                />
                 <div
                   style={{
                     flex: 1,
@@ -4443,12 +4531,12 @@ export default function AquaGuardDashboard() {
                   {[
                     {
                       l: 'الكمية الواصلة',
-                      v: `${mass.deliveredM3?.toFixed(1) ?? 0} م³`,
+                      v: `${displayedDeliveredM3.toFixed(1)} م³`,
                       c: '#22c55e',
                     },
                     {
-                      l: 'الفاقد الحالي',
-                      v: `−${mass.systemLossM3?.toFixed(1) ?? 0} م³`,
+                      l: 'الفاقد المتبقي المتوقع',
+                      v: `−${displayedLossM3.toFixed(1)} م³`,
                       c: '#ef4444',
                     },
                     {
@@ -4470,12 +4558,14 @@ export default function AquaGuardDashboard() {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <span style={{ color: '#475569' }}>{l}</span>
+                      <span style={{ color: '#94A3B8' }}>{l}</span>
                       <span
+                        dir="ltr"
                         style={{
                           color: c,
                           fontFamily: 'monospace',
-                          fontWeight: 600,
+                          fontWeight: 700,
+                          unicodeBidi: 'isolate',
                         }}
                       >
                         {v}
@@ -4483,6 +4573,19 @@ export default function AquaGuardDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+              <div
+                style={{
+                  marginTop: 10,
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                  color: '#94A3B8',
+                  fontWeight: 600,
+                }}
+              >
+                الرقم تقديري لتطبيق مُراقَب؛{' '}
+                <span dir="ltr">{(gov.nrw * 100).toFixed(0)}%</span> يمثل خط الأساس
+                قبل <span dir="ltr">AquaGuard</span>.
               </div>
             </div>
 
@@ -4548,15 +4651,18 @@ export default function AquaGuardDashboard() {
                     الثقة
                   </div>
                   <div
+                    dir="ltr"
                     style={{
                       fontSize: 16,
                       fontWeight: 950,
                       color: '#F8FAFC',
                       marginTop: 2,
                       fontFamily: 'monospace',
+                      textAlign: 'start',
+                      unicodeBidi: 'isolate',
                     }}
                   >
-                    {formatConfidence(selectedOrWorst?.confidence)}
+                    {confidenceLabel(worstType, selectedOrWorst?.confidence)}
                   </div>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -4739,7 +4845,7 @@ export default function AquaGuardDashboard() {
                     ['معامل الخشونة', `${selectedSeg.hw}`, '#94a3b8'],
                     [
                       'الثقة',
-                      formatConfidence(selectedSeg.confidence),
+                      confidenceLabel(selectedSeg.predType, selectedSeg.confidence),
                       TYPE_DOT[selectedSeg.predType],
                     ],
                   ].map(([l, v, c]) => (
@@ -4750,7 +4856,7 @@ export default function AquaGuardDashboard() {
                         borderBottom: '1px solid rgba(56,189,248,.04)',
                       }}
                     >
-                      <div style={{ fontSize: 9, color: '#475569' }}>{l}</div>
+                      <div style={{ fontSize: 9, color: '#94a3b8' }}>{l}</div>
                       <div
                         style={{
                           fontSize: 12,
@@ -4772,7 +4878,7 @@ export default function AquaGuardDashboard() {
                   }}
                 >
                   <div
-                    style={{ fontSize: 9, color: '#475569', marginBottom: 6 }}
+                    style={{ fontSize: 9, color: '#94a3b8', marginBottom: 6 }}
                   >
                     توافق النماذج
                   </div>
@@ -4793,7 +4899,7 @@ export default function AquaGuardDashboard() {
                         <div
                           style={{
                             fontSize: 9,
-                            color: '#475569',
+                            color: '#94a3b8',
                             marginBottom: 2,
                           }}
                         >
@@ -4840,7 +4946,7 @@ export default function AquaGuardDashboard() {
                 <span
                   style={{
                     fontSize: 10,
-                    color: '#475569',
+                    color: '#94a3b8',
                     fontFamily: 'monospace',
                     letterSpacing: 0.5,
                   }}
@@ -4869,7 +4975,7 @@ export default function AquaGuardDashboard() {
                 {allAlerts.length === 0 && (
                   <div
                     style={{
-                      color: '#334155',
+                      color: '#94a3b8',
                       fontSize: 11,
                       textAlign: 'center',
                       padding: 16,
@@ -4913,7 +5019,7 @@ export default function AquaGuardDashboard() {
                         <span
                           style={{
                             fontSize: 9,
-                            color: '#475569',
+                            color: '#94a3b8',
                             fontFamily: 'monospace',
                           }}
                         >
@@ -4959,7 +5065,7 @@ export default function AquaGuardDashboard() {
           <div
             style={{
               fontSize: 10,
-              color: '#475569',
+              color: '#94a3b8',
               fontFamily: 'monospace',
               letterSpacing: 0.5,
               marginBottom: 12,
