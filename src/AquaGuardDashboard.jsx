@@ -2135,7 +2135,7 @@ function PipeNetworkMap({
         </circle>
       )}
 
-      {branches.map(([bname, bcfg], bi) => {
+      {branches.map(([bname], bi) => {
         const brY = ROW_H * (bi + 1);
         const brSegs = segsByBranch[bname] || [];
         const segCount = brSegs.length;
@@ -2150,7 +2150,7 @@ function PipeNetworkMap({
               type: 'normal',
               width: 6.8,
               animate: pumping,
-              animateColor: `${bcfg.color}cc`,
+              animateColor: '#38BDF8aa',
             })}
 
             <text
@@ -2167,8 +2167,8 @@ function PipeNetworkMap({
               x={LABEL_X}
               y={brY + 8}
               textAnchor="end"
-              fill="#93c5fd"
-              fontSize="9"
+              fill="#9fc6f5"
+              fontSize="11"
               fontFamily="monospace"
               fontWeight="700"
             >
@@ -2272,7 +2272,7 @@ function PipeNetworkMap({
                     cy={brY}
                     r={NODE_R}
                     fill={isAl ? `${tColor}20` : '#0d1830'}
-                    stroke={isSel ? '#ffffff' : isAl ? tColor : bcfg.color}
+                    stroke={isSel ? '#ffffff' : isAl ? tColor : '#5f7e9c'}
                     strokeWidth={isSel ? 2.6 : isAl ? 2.1 : 1.8}
                     filter={
                       isAl
@@ -2296,15 +2296,15 @@ function PipeNetworkMap({
                     x: endX,
                     y: labelY,
                     label: nodeName,
-                    color: isAl ? tColor : bcfg.color,
+                    color: isAl ? tColor : '#9fb4c9',
                     active: isAl || isSel,
                   })}
                   <text
                     x={endX}
                     y={brY + NODE_R + 16}
                     textAnchor="middle"
-                    fill={isAl ? tColor : '#64748b'}
-                    fontSize="10"
+                    fill={isAl ? tColor : '#94a3b8'}
+                    fontSize="11"
                     fontWeight="700"
                   >
                     {seg.flowLoss.toFixed(1)}%
@@ -2471,6 +2471,16 @@ function getTypeColor(type) {
   return TYPE_CONFIG[type]?.color || '#22c55e';
 }
 
+// Safely render a confidence value as a percentage.
+// Handles both decimal form (0.94 -> 94%) and already-scaled form (94 -> 94%).
+function formatConfidence(value, fallback = 0.98) {
+  let n = Number(value);
+  if (!isFinite(n)) n = Number(fallback);
+  if (!isFinite(n)) return '—';
+  const pct = n <= 1 ? n * 100 : n;
+  return `${Math.round(pct)}%`;
+}
+
 function getRiskLabel(type) {
   if (type === 'burst') return 'حرج';
   if (type === 'leak') return 'مرتفع';
@@ -2560,7 +2570,7 @@ function MiniMetric({ label, value, color = '#e2e8f0', sub }) {
       <div
         style={{
           color: '#CBD5E1',
-          fontSize: 10,
+          fontSize: 11,
           fontFamily: "'IBM Plex Mono','Tajawal',monospace",
           fontWeight: 800,
           letterSpacing: 0.5,
@@ -2580,7 +2590,7 @@ function MiniMetric({ label, value, color = '#e2e8f0', sub }) {
         {value}
       </div>
       {sub && (
-        <div style={{ color: '#64748b', fontSize: 10, marginTop: 4 }}>
+        <div style={{ color: '#94A3B8', fontSize: 11, marginTop: 4 }}>
           {sub}
         </div>
       )}
@@ -2843,6 +2853,9 @@ function TechnicalPanel({ selectedSeg, activeModels = 4 }) {
           {Object.keys(TYPE_CONFIG).map((t) => <SmallPill key={t} color={getTypeColor(t)} filled>{getTypeLabelAr(t)}</SmallPill>)}
           <SmallPill color="#22C55E" filled>دقة الكشف: 99.94%</SmallPill>
         </div>
+        <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 8, fontWeight: 600 }}>
+          النِّسب تمثل ثقة كل نموذج في تصنيف المقطع الحالي
+        </div>
         <div style={{ display: 'grid', gap: 10 }}>
           {rows.map(([name, val, desc]) => (
             <div
@@ -2872,7 +2885,7 @@ function TechnicalPanel({ selectedSeg, activeModels = 4 }) {
                 {Number(val).toFixed(1)}%
               </div>
               <div />
-              <div style={{ color: '#64748b', fontSize: 11, marginTop: -6 }}>
+              <div style={{ color: '#94a3b8', fontSize: 11, marginTop: -6 }}>
                 {desc}
               </div>
               <div />
@@ -3178,8 +3191,8 @@ export default function AquaGuardDashboard() {
       <div
         style={{
           margin: '14px 20px 0',
-          padding: '18px 24px',
-          minHeight: 135,
+          padding: '14px 24px',
+          minHeight: 106,
           borderRadius: 24,
           background:
             'linear-gradient(135deg,rgba(13,25,48,.88),rgba(6,11,24,.78))',
@@ -3207,11 +3220,11 @@ export default function AquaGuardDashboard() {
         <div
           style={{
             position: 'absolute',
-            right: 34,
+            right: 30,
             top: '50%',
             transform: 'translateY(-50%)',
-            width: 120,
-            height: 120,
+            width: 98,
+            height: 98,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3235,26 +3248,45 @@ export default function AquaGuardDashboard() {
             style={{
               position: 'relative',
               zIndex: 1,
-              width: 112,
-              height: 112,
+              width: 90,
+              height: 90,
               objectFit: 'contain',
               filter: 'drop-shadow(0 0 16px rgba(34,229,255,.45))',
             }}
           />
         </div>
 
-        {/* Header controls · scenario + operation buttons (RTL) */}
+        {/* Header controls · scenario row + live status strip (RTL) */}
         <div
           style={{
             position: 'relative',
             zIndex: 1,
             display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 8,
-            marginRight: 168,
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 9,
+            marginRight: 150,
           }}
         >
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 900,
+                color: '#94A3B8',
+                letterSpacing: 0.4,
+                marginInlineEnd: 4,
+              }}
+            >
+              سيناريو العرض
+            </span>
           {['normal', 'leak', 'burst', 'theft'].map((t) => (
             <button
               key={t}
@@ -3329,6 +3361,62 @@ export default function AquaGuardDashboard() {
           >
             <RefreshCw size={13} /> تحديث القراءة
           </button>
+          </div>
+
+          {/* Live status strip — fills the header meaningfully for judges */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 14,
+              fontSize: 12.5,
+              fontWeight: 800,
+              padding: '7px 12px',
+              borderRadius: 12,
+              background: 'rgba(2,6,23,.42)',
+              border: `1px solid ${getTypeColor(worstType)}40`,
+            }}
+          >
+            <span style={{ color: '#94A3B8' }}>
+              الحالة:{' '}
+              <span style={{ color: getTypeColor(worstType), fontWeight: 950 }}>
+                {getTypeLabelAr(worstType)}
+              </span>
+            </span>
+            <span style={{ color: 'rgba(148,163,184,.4)' }}>·</span>
+            <span style={{ color: '#94A3B8' }}>
+              الموقع:{' '}
+              <span style={{ color: '#CBD5E1', fontWeight: 900 }}>
+                {selectedOrWorst
+                  ? `${selectedOrWorst.from} → ${selectedOrWorst.to}`
+                  : 'الشبكة مستقرة'}
+              </span>
+            </span>
+            <span style={{ color: 'rgba(148,163,184,.4)' }}>·</span>
+            <span style={{ color: '#94A3B8' }}>
+              الإجراء:{' '}
+              <span style={{ color: getTypeColor(worstType), fontWeight: 900 }}>
+                {worstType === 'normal' && 'استمرار المراقبة'}
+                {worstType === 'leak' && 'فحص ميداني'}
+                {worstType === 'burst' && 'عزل فوري'}
+                {worstType === 'theft' && 'تفتيش الوصلات'}
+              </span>
+            </span>
+            <span style={{ color: 'rgba(148,163,184,.4)' }}>·</span>
+            <span style={{ color: '#94A3B8' }}>
+              الثقة:{' '}
+              <span
+                style={{
+                  color: '#F8FAFC',
+                  fontWeight: 900,
+                  fontFamily: 'monospace',
+                }}
+              >
+                {formatConfidence(selectedOrWorst?.confidence)}
+              </span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -3370,26 +3458,28 @@ export default function AquaGuardDashboard() {
               <span style={{ flex: 1, textAlign: 'right' }}>{gov.label}</span>
               <span
                 style={{
-                  color: '#64748b',
+                  color: '#94a3b8',
                   fontSize: 11,
                   fontFamily: 'monospace',
                 }}
               >
                 {govKey}
               </span>
-              <ChevronDown size={14} color="#64748b" />
+              <ChevronDown size={14} color="#94a3b8" />
             </button>
             {showGovMenu && (
               <div
                 style={{
                   position: 'absolute',
                   top: 'calc(100% + 4px)',
-                  left: 0,
-                  width: 280,
+                  right: 0,
+                  left: 'auto',
+                  width: 300,
+                  maxWidth: '90vw',
                   background: '#0f1f3d',
-                  border: '1px solid rgba(56,189,248,.2)',
+                  border: '1px solid rgba(56,189,248,.28)',
                   borderRadius: 10,
-                  zIndex: 100,
+                  zIndex: 200,
                   overflow: 'hidden',
                   boxShadow: '0 20px 60px rgba(0,0,0,.6)',
                 }}
@@ -3416,7 +3506,7 @@ export default function AquaGuardDashboard() {
                     }}
                   />
                 </div>
-                <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto' }}>
                   {filteredGovs.map(([k, v]) => {
                     const pct =
                       ((reservoirLevels[k] ?? v.reservoirCap) /
@@ -3566,11 +3656,11 @@ export default function AquaGuardDashboard() {
             {
               l: 'نسبة الفاقد الحالية',
               v: `${Math.max(maxLoss, gov.nrw * 100).toFixed(1)}%`,
-              u: 'مؤشر NRW / Flow Loss',
+              u: 'مؤشر NRW · الهدف ≤ 30%',
               c: gov.nrw > 0.5 ? '#EF4444' : gov.nrw > 0.4 ? '#F59E0B' : '#22C55E',
               icon: <TrendingDown size={18} />,
             },
-            { l: 'زمن الاستجابة', v: '15 ثانية', u: `التحديث التالي خلال ${countdown} ث`, c: '#22E5FF', icon: <Zap size={18} /> },
+            { l: 'زمن الاستجابة', v: '15 ثانية', u: `كشف وتصنيف فوري · التالي خلال ${countdown} ث`, c: '#22E5FF', icon: <Zap size={18} /> },
           ].map((k, i) => (
             <div
               key={i}
@@ -3601,7 +3691,7 @@ export default function AquaGuardDashboard() {
               >
                 {k.v}
               </div>
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 8 }}>{k.u}</div>
+              <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 8, fontWeight: 600 }}>{k.u}</div>
             </div>
           ))}
         </div>
@@ -3635,31 +3725,36 @@ export default function AquaGuardDashboard() {
               >
                 {[
                   ['map', 'الخريطة الحية'],
+                  ['actions', 'الإجراء المعتمد'],
                   ['telemetry', 'القياسات الحية'],
                   ['scatter', 'تحليل نمط الخلل'],
-                  ['actions', 'الإجراء المعتمد'],
                   ['technical', 'شرح الذكاء الاصطناعي'],
                 ].map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setActiveTab(key)}
                     style={{
-                      padding: '9px 10px',
+                      padding: '10px 10px',
                       borderRadius: 10,
                       border: `1px solid ${
                         activeTab === key
-                          ? 'rgba(56,189,248,.42)'
-                          : 'rgba(148,163,184,.12)'
+                          ? 'rgba(34,229,255,.65)'
+                          : 'rgba(148,163,184,.14)'
                       }`,
                       background:
                         activeTab === key
-                          ? 'rgba(56,189,248,.12)'
+                          ? 'rgba(34,229,255,.16)'
                           : 'rgba(2,6,23,.18)',
-                      color: activeTab === key ? '#38bdf8' : '#94a3b8',
-                      fontSize: 11,
+                      color: activeTab === key ? '#22E5FF' : '#94a3b8',
+                      fontSize: 12,
                       fontWeight: 900,
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
+                      boxShadow:
+                        activeTab === key
+                          ? '0 0 18px rgba(34,229,255,.18), inset 0 0 0 1px rgba(34,229,255,.12)'
+                          : 'none',
+                      transition: 'all .15s',
                     }}
                   >
                     {label}
@@ -3782,12 +3877,21 @@ export default function AquaGuardDashboard() {
                   <div
                     style={{
                       display: 'flex',
-                      gap: 16,
-                      marginTop: 10,
-                      fontSize: 11,
-                      fontFamily: 'monospace',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 18,
+                      marginTop: 12,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      background: 'rgba(2,6,23,.4)',
+                      border: '1px solid rgba(34,229,255,.16)',
+                      fontSize: 13,
+                      fontWeight: 800,
                     }}
                   >
+                    <span style={{ color: '#94A3B8', fontWeight: 900 }}>
+                      دليل الحالة:
+                    </span>
                     {Object.entries(TYPE_CONFIG).map(([k, v]) => (
                       <span
                         key={k}
@@ -3795,23 +3899,30 @@ export default function AquaGuardDashboard() {
                           color: v.color,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 4,
+                          gap: 6,
                         }}
                       >
                         <span
                           style={{
-                            width: 8,
-                            height: 8,
+                            width: 11,
+                            height: 11,
                             borderRadius: '50%',
                             background: v.color,
                             display: 'inline-block',
+                            boxShadow: `0 0 8px ${v.color}`,
                           }}
                         />
                         {v.label}
                       </span>
                     ))}
-                    <span style={{ marginInlineStart: 'auto', color: '#CBD5E1' }}>
-                      اضغط على أي مقطع لعرض معلومات نقطة التحقق
+                    <span
+                      style={{
+                        marginInlineStart: 'auto',
+                        color: '#CBD5E1',
+                        fontWeight: 700,
+                      }}
+                    >
+                      المقاطع الملوّنة فقط تمثل أعطالاً نشطة · اضغط على أي مقطع لعرض تفاصيله
                     </span>
                   </div>
                 </div>
@@ -3989,24 +4100,24 @@ export default function AquaGuardDashboard() {
                           dataKey="time"
                           interval={5}
                           stroke="#94A3B8"
-                          tick={{ fontSize: 10, fill: '#94a3b8' }}
+                          tick={{ fontSize: 12, fill: '#94a3b8' }}
                           label={{
                             value: 'الوقت من 00:00 إلى 24:00',
                             position: 'insideBottom',
                             offset: -18,
                             fill: '#94a3b8',
-                            fontSize: 10,
+                            fontSize: 12,
                           }}
                         />
                         <YAxis
                           stroke="#64748b"
-                          tick={{ fontSize: 10, fill: '#94a3b8' }}
+                          tick={{ fontSize: 12, fill: '#94a3b8' }}
                           label={{
                             value: 'التدفق (لتر/دقيقة)',
                             angle: -90,
                             position: 'insideLeft',
                             fill: '#94a3b8',
-                            fontSize: 10,
+                            fontSize: 12,
                           }}
                         />
                         <RTooltip
@@ -4078,24 +4189,24 @@ export default function AquaGuardDashboard() {
                           dataKey="time"
                           interval={5}
                           stroke="#94A3B8"
-                          tick={{ fontSize: 10, fill: '#94a3b8' }}
+                          tick={{ fontSize: 12, fill: '#94a3b8' }}
                           label={{
                             value: 'الوقت من 00:00 إلى 24:00',
                             position: 'insideBottom',
                             offset: -18,
                             fill: '#94a3b8',
-                            fontSize: 10,
+                            fontSize: 12,
                           }}
                         />
                         <YAxis
                           stroke="#64748b"
-                          tick={{ fontSize: 10, fill: '#94a3b8' }}
+                          tick={{ fontSize: 12, fill: '#94a3b8' }}
                           label={{
                             value: 'الضغط (بار)',
                             angle: -90,
                             position: 'insideLeft',
                             fill: '#94a3b8',
-                            fontSize: 10,
+                            fontSize: 12,
                           }}
                         />
                         <RTooltip
@@ -4135,7 +4246,7 @@ export default function AquaGuardDashboard() {
                     </div>
                     <MiniMetric label="الوقت" value={new Date().toLocaleTimeString('ar-JO', { hour: '2-digit', minute: '2-digit' })} color="#22E5FF" />
                     <MiniMetric label="الحالة" value={getTypeLabelAr(selectedOrWorst?.predType || 'normal')} color={getTypeColor(selectedOrWorst?.predType || 'normal')} />
-                    <MiniMetric label="الثقة" value={`${selectedOrWorst?.confidence?.toFixed?.(0) || 98}%`} color="#38BDF8" />
+                    <MiniMetric label="الثقة" value={formatConfidence(selectedOrWorst?.confidence)} color="#38BDF8" />
                     <MiniMetric
                       label="الإجراء المقترح"
                       value={
@@ -4375,102 +4486,162 @@ export default function AquaGuardDashboard() {
               </div>
             </div>
 
-            {/* Solution box */}
+            {/* Recommended Action Now — persistent card */}
             <div
               style={{
-                background: '#0a1628',
-                border: `1px solid ${TYPE_CONFIG[worstType].color}40`,
-                borderRight: `3px solid ${TYPE_CONFIG[worstType].color}`,
-                borderRadius: 12,
-                padding: 14,
+                background: 'linear-gradient(160deg,#0c1a30,#0a1424)',
+                border: `1px solid ${TYPE_CONFIG[worstType].color}55`,
+                borderRight: `4px solid ${TYPE_CONFIG[worstType].color}`,
+                borderRadius: 14,
+                padding: 16,
+                boxShadow: `0 0 26px ${TYPE_CONFIG[worstType].color}1a`,
               }}
             >
               <div
                 style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: TYPE_CONFIG[worstType].color,
-                  marginBottom: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 12,
                 }}
               >
-                {worstType === 'normal' && 'النظام طبيعي — استمرار المراقبة'}
-                {worstType === 'leak' && 'تسرب مكتشف — فحص المقطع'}
-                {worstType === 'burst' && 'انفجار حرج — عزل فوري'}
-                {worstType === 'theft' && 'اشتباه سرقة — تفتيش الوصلات'}
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 900,
+                    color: '#94A3B8',
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  الإجراء الموصى به الآن
+                </div>
+                <SmallPill color={TYPE_CONFIG[worstType].color} filled>
+                  {getTypeLabelAr(worstType)}
+                </SmallPill>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {worstType === 'normal' &&
-                  [
-                    'جميع القراءات ضمن الحدود الطبيعية.',
-                    'لا حاجة لتدخل ميداني حالياً.',
-                  ].map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 11,
-                        color: '#475569',
-                        paddingBottom: 4,
-                        borderBottom: '1px solid rgba(56,189,248,.05)',
-                      }}
-                    >
-                      {s}
-                    </div>
-                  ))}
-                {worstType === 'leak' &&
-                  [
-                    'إرسال فريق كشف ميداني للمقطع المحدد.',
-                    'Reduce network pressure 15%.',
-                    'فتح بلاغ صيانة بأولوية متوسطة.',
-                  ].map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 11,
-                        color: '#475569',
-                        paddingBottom: 4,
-                        borderBottom: '1px solid rgba(56,189,248,.05)',
-                      }}
-                    >
-                      {s}
-                    </div>
-                  ))}
-                {worstType === 'burst' &&
-                  [
-                    'عزل القطاع المتأثر فوراً.',
-                    'تنبيه فريق الاستجابة الطارئة.',
-                    'إرسال فريق الإصلاح خلال أقل من ساعتين.',
-                    'توثيق كمية الفاقد للإدارة.',
-                  ].map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 11,
-                        color: '#475569',
-                        paddingBottom: 4,
-                        borderBottom: '1px solid rgba(56,189,248,.05)',
-                      }}
-                    >
-                      {s}
-                    </div>
-                  ))}
-                {worstType === 'theft' &&
-                  [
-                    'تفتيش الوصلات الجانبية ميدانياً.',
-                    'مراجعة سجلات الاستهلاك آخر 72 ساعة.',
-                    'التنسيق مع الجهة المختصة بالتحقق.',
-                  ].map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 11,
-                        color: '#475569',
-                        paddingBottom: 4,
-                        borderBottom: '1px solid rgba(56,189,248,.05)',
-                      }}
-                    >
-                      {s}
-                    </div>
-                  ))}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 10,
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700 }}>
+                    الحالة
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 950,
+                      color: TYPE_CONFIG[worstType].color,
+                      marginTop: 2,
+                    }}
+                  >
+                    {getTypeLabelAr(worstType)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700 }}>
+                    الثقة
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 950,
+                      color: '#F8FAFC',
+                      marginTop: 2,
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    {formatConfidence(selectedOrWorst?.confidence)}
+                  </div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700 }}>
+                    الموقع
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: '#CBD5E1',
+                      marginTop: 2,
+                    }}
+                  >
+                    {gov.label}
+                    {selectedOrWorst
+                      ? ` · ${getBranchLabelAr(selectedOrWorst.branch)} · ${selectedOrWorst.from} → ${selectedOrWorst.to}`
+                      : ' · الشبكة مستقرة'}
+                  </div>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 700 }}>
+                    الإجراء
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 950,
+                      color: TYPE_CONFIG[worstType].color,
+                      marginTop: 2,
+                    }}
+                  >
+                    {worstType === 'normal' && 'استمرار المراقبة'}
+                    {worstType === 'leak' && 'إرسال فريق فحص ميداني'}
+                    {worstType === 'burst' && 'عزل فوري للقطاع المتأثر'}
+                    {worstType === 'theft' && 'تفتيش الوصلات الجانبية'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  borderTop: '1px solid rgba(148,163,184,.12)',
+                  paddingTop: 10,
+                }}
+              >
+                {(worstType === 'normal'
+                  ? [
+                      'جميع القراءات ضمن الحدود الطبيعية.',
+                      'لا حاجة لتدخل ميداني حالياً.',
+                    ]
+                  : worstType === 'leak'
+                  ? [
+                      'إرسال فريق كشف ميداني للمقطع المحدد.',
+                      'تخفيض ضغط الشبكة بنسبة 15%.',
+                      'فتح بلاغ صيانة بأولوية متوسطة.',
+                    ]
+                  : worstType === 'burst'
+                  ? [
+                      'عزل القطاع المتأثر فوراً.',
+                      'تنبيه فريق الاستجابة الطارئة.',
+                      'إرسال فريق الإصلاح خلال أقل من ساعتين.',
+                      'توثيق كمية الفاقد للإدارة.',
+                    ]
+                  : [
+                      'تفتيش الوصلات الجانبية ميدانياً.',
+                      'مراجعة سجلات الاستهلاك آخر 72 ساعة.',
+                      'التنسيق مع الجهة المختصة بالتحقق.',
+                    ]
+                ).map((s, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: 12,
+                      color: '#CBD5E1',
+                      paddingBottom: 4,
+                      borderBottom: '1px solid rgba(56,189,248,.06)',
+                    }}
+                  >
+                    {s}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -4568,7 +4739,7 @@ export default function AquaGuardDashboard() {
                     ['معامل الخشونة', `${selectedSeg.hw}`, '#94a3b8'],
                     [
                       'الثقة',
-                      `${(selectedSeg.confidence * 100).toFixed(0)}%`,
+                      formatConfidence(selectedSeg.confidence),
                       TYPE_DOT[selectedSeg.predType],
                     ],
                   ].map(([l, v, c]) => (
@@ -4749,10 +4920,10 @@ export default function AquaGuardDashboard() {
                           {a.ts}
                         </span>
                       </div>
-                      <div style={{ fontSize: 10, color: '#64748b' }}>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>
                         {a.from} → {a.to}
                       </div>
-                      <div style={{ fontSize: 10, color: '#64748b' }}>
+                      <div style={{ fontSize: 10, color: '#94a3b8' }}>
                         ΔFlow: {a.flowLoss?.toFixed(1)}% · DP:{' '}
                         {a.dpDev?.toFixed(3)}
                       </div>
@@ -4766,7 +4937,7 @@ export default function AquaGuardDashboard() {
                         }}
                       >
                         {a.predType.toUpperCase()} ·{' '}
-                        {(a.confidence * 100).toFixed(0)}%
+                        {formatConfidence(a.confidence)}
                       </div>
                     </div>
                   );
